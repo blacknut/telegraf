@@ -87,6 +87,8 @@ type perfobject struct {
 	WarnOnMissing bool
 	FailOnMissing bool
 	IncludeTotal  bool
+	// JLR set to true for irregular processes ie not always running
+	Irregular     bool
 }
 
 // Parsed configuration ends up here after it has been validated for valid
@@ -109,8 +111,9 @@ type item struct {
 var sanitizedChars = strings.NewReplacer("/sec", "_persec", "/Sec", "_persec",
 	" ", "_", "%", "Percent", `\`, "")
 
+// JLR irregular
 func (m *Win_PerfCounters) AddItem(metrics *itemList, query string, objectName string, counter string, instance string,
-	measurement string, include_total bool) error {
+	measurement string, include_total bool, irregular bool) error {
 
 	var handle PDH_HQUERY
 	var counterHandle PDH_HCOUNTER
@@ -123,7 +126,8 @@ func (m *Win_PerfCounters) AddItem(metrics *itemList, query string, objectName s
 
 	// Call PdhCollectQueryData one time to check existance of the counter
 	ret = PdhCollectQueryData(handle)
-	if ret != ERROR_SUCCESS {
+	// JLR irregular
+	if ret != ERROR_SUCCESS && !irregular {
 		PdhCloseQuery(handle)
 		return errors.New(PdhFormatError(ret))
 	}
@@ -165,8 +169,9 @@ func (m *Win_PerfCounters) ParseConfig(metrics *itemList) error {
 						query = "\\" + objectname + "(" + instance + ")\\" + counter
 					}
 
+					// JLR irregular
 					err := m.AddItem(metrics, query, objectname, counter, instance,
-						PerfObject.Measurement, PerfObject.IncludeTotal)
+						PerfObject.Measurement, PerfObject.IncludeTotal, PerfObject.Irregular)
 
 					if err == nil {
 						if m.PrintValid {
